@@ -1,73 +1,78 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-export interface DisputeForm {
-  category: string;
-  intensity: number;
-  description: string;
-}
 
 const categories = [
   { value: "chores", label: "Chores", emoji: "🧹" },
   { value: "money", label: "Money", emoji: "💰" },
-  { value: "communication", label: "Communication", emoji: "💬" },
+  { value: "communication", label: "Comm", emoji: "💬" },
   { value: "time", label: "Time", emoji: "⏰" },
-  { value: "affection", label: "Affection", emoji: "❤️" },
+  { value: "affection", label: "Love", emoji: "❤️" },
   { value: "other", label: "Other", emoji: "🤷" },
 ];
 
+function generateCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
 export default function PartnerAForm() {
   const router = useRouter();
-  const [form, setForm] = useState<DisputeForm>({
-    category: "",
-    intensity: 3,
-    description: "",
-  });
+  const [form, setForm] = useState({ category: "", intensity: 3, description: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [shareMode, setShareMode] = useState(false);
+  const [shareCode, setShareCode] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const validate = useCallback((): boolean => {
+  const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!form.category) newErrors.category = "required";
     if (!form.description.trim()) newErrors.description = "required";
     else if (form.description.length < 20) newErrors.description = "too_short";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [form.category, form.description]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) {
-      // Shake animation
-      const formEl = document.getElementById('dispute-form');
-      formEl?.classList.add('animate-shake');
-      setTimeout(() => formEl?.classList.remove('animate-shake'), 500);
-      return;
-    }
-
+    if (!validate()) return;
     setIsSubmitting(true);
     
-    const caseId = `CASE-${Date.now().toString(36).toUpperCase()}`;
-    const partnerASubmission = {
-      id: caseId,
+    const codeGenerate = generateCode();
+    const caseData = {
+      id: codeGenerate,
       partnerA: form,
       timestamp: new Date().toISOString(),
+      status: "pending",
     };
-    localStorage.setItem("lovecourt_partner_a", JSON.stringify(partnerASubmission));
     
-    router.push("/partner-b");
+    if (shareMode) {
+      // Show share code for Partner B to join remotely
+      localStorage.setItem("lovecourt_pending_" + codeGenerate, JSON.stringify(caseData));
+      setShareCode(codeGenerate);
+      setIsSubmitting(false);
+    } else {
+      // Same device: store directly and go to Partner B
+      localStorage.setItem("lovecourt_pending", JSON.stringify(caseData));
+      router.push("/partner-b");
+    }
   };
 
-  const handleBlur = (field: keyof DisputeForm) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    validate();
+  const copyLink = async () => {
+    const link = `${window.location.origin}/join/${shareCode}`;
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const updateField = (field: keyof DisputeForm, value: string | number) => {
+  const handleInput = (field: string, value: string | number) => {
     setForm(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       const { [field]: _, ...rest } = errors;
@@ -75,165 +80,132 @@ export default function PartnerAForm() {
     }
   };
 
+  if (shareCode) {
+    return (
+      <main className="min-h-screen flex flex-col items-center px-4 py-8 bg-pattern">
+        <div className="container max-w-lg mx-auto w-full text-center">
+          <div className="card mb-6">
+            <span className="text-4xl block mb-4">🔗</span>
+            <h2 className="display-2 font-serif text-[var(--gold-400)] mb-4">
+              Share with Partner B
+            </h2>
+            <p className="text-[var(--text-muted)] mb-4">
+              Send this link:
+            </p>
+            <div className="bg-[var(--navy-700)] rounded-lg p-3 mb-4 overflow-x-auto">
+              <code className="text-[var(--gold-400)] text-sm whitespace-nowrap">
+                {typeof window !== 'undefined' ? `${window.location.origin}/join/${shareCode}` : `/join/${shareCode}`}
+              </code>
+            </div>
+            <button onClick={copyLink} className="btn btn-primary w-full">
+              {copied ? "✓ Copied!" : "📋 Copy Link"}
+            </button>
+          </div>
+          <Link href="/partner-b" className="btn btn-secondary w-full">
+            Or continue here →
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-8 bg-pattern">
       <div className="container max-w-lg mx-auto w-full">
-        {/* Back Link */}
-        <Link href="/" className="btn btn-ghost mb-6 hover-glow">
-          <span aria-hidden="true">←</span>
-          Back to Court
-        </Link>
+        <Link href="/" className="btn btn-ghost mb-6">← Back</Link>
 
-        {/* Header with judge nod */}
         <div className="text-center mb-8">
-          <span className="text-5xl block mb-4 judge-nod" role="img" aria-label="Partner A">👤</span>
-          <h1 className="display-2 font-serif text-[var(--cream)] mb-2">
-            Partner A&apos;s Turn
-          </h1>
-          <p className="text-[var(--text-secondary)]">
-            Present your side of the story
-          </p>
+          <span className="text-5xl block mb-4 judge-nod">👤</span>
+          <h1 className="display-2 font-serif text-[var(--cream)] mb-2">Partner A</h1>
+          <p className="text-[var(--text-secondary)]">File your dispute</p>
         </div>
 
-        {/* Progress */}
+        {shareMode && (
+          <div className="card mb-6 animate-fade-up">
+            <p className="text-sm text-[var(--text-muted)] mb-4">
+              Partner B will join remotely. When they submit, you'll both see the verdict!
+            </p>
+            <button onClick={() => setShareMode(false)} className="btn btn-ghost w-full">
+              ← Actually, we're together
+            </button>
+          </div>
+        )}
+
         <div className="progress-track mb-8">
           <div className="progress-bar" style={{ width: '33%' }} />
         </div>
 
-        {/* Form with slide in from right */}
-        <form 
-          id="dispute-form"
-          onSubmit={handleSubmit} 
-          className="space-y-8 animate-slide-right"
-        >
-          {/* Category - Card Grid */}
-          <div>
-            <fieldset>
-              <legend className="text-sm font-medium text-[var(--text-secondary)] mb-4">
-                What are you disputing?
-                <span className="text-[var(--accent)] ml-1">*</span>
-              </legend>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {categories.map(cat => (
-                  <button
-                    key={cat.value}
-                    type="button"
-                    onClick={() => updateField("category", cat.value)}
-                    aria-pressed={form.category === cat.value}
-                    className={`card card-interactive text-center py-4 ${
-                      form.category === cat.value 
-                        ? 'border-[var(--accent)] shadow-glow' 
-                        : ''
-                    }`}
-                  >
-                    <span className="text-2xl block mb-1">{cat.emoji}</span>
-                    <span className="text-sm">{cat.label}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            {errors.category && touched.category && (
-              <p className="text-[var(--error)] text-sm mt-2 animate-shake" role="alert">
-                Please select a category
-              </p>
-            )}
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-8 animate-slide-right">
+          <fieldset>
+            <legend className="text-sm font-medium text-[var(--text-secondary)] mb-4">
+              What are you disputing? *
+            </legend>
+            <div className="grid grid-cols-3 gap-3">
+              {categories.map(cat => (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => handleInput("category", cat.value)}
+                  className={`card card-interactive text-center py-3 ${
+                    form.category === cat.value ? 'border-[var(--accent)] shadow-glow' : ''
+                  }`}
+                >
+                  <span className="text-xl block">{cat.emoji}</span>
+                  <span className="text-sm">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-          {/* Intensity - styled slider */}
           <div>
-            <label className="text-sm font-medium text-[var(--text-secondary)] mb-4 flex justify-between">
-              <span>How intense is this?</span>
-              <span className="text-[var(--gold-400)] font-bold">
-                {form.intensity}/5
-              </span>
+            <label className="text-sm font-medium text-[var(--text-secondary)] mb-3 flex justify-between">
+              <span>Intensity</span>
+              <span className="text-[var(--gold-400)]">{form.intensity}/5</span>
             </label>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map(level => (
                 <button
                   key={level}
                   type="button"
-                  onClick={() => updateField("intensity", level)}
-                  aria-pressed={form.intensity >= level}
-                  className={`flex-1 py-4 rounded-lg font-semibold transition-all duration-200 ${
+                  onClick={() => handleInput("intensity", level)}
+                  className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
                     level <= form.intensity 
-                      ? 'bg-gradient-to-b from-[var(--gold-500)] to-[var(--gold-600)] text-[var(--navy-900)] shadow-glow' 
-                      : 'bg-[var(--bg-interactive)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                      ? 'bg-[var(--gold-500)] text-[var(--navy-900)]' 
+                      : 'bg-[var(--bg-interactive)]'
                   }`}
                 >
                   {level}
                 </button>
               ))}
             </div>
-            <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2 px-1">
-              <span>Chill 😌</span>
-              <span>WOR ⚔️</span>
-            </div>
           </div>
 
-          {/* Description */}
           <div>
-            <label 
-              htmlFor="description" 
-              className="text-sm font-medium text-[var(--text-secondary)] mb-3 block"
-            >
-              Describe your side of the dispute
-              <span className="text-[var(--accent)] ml-1">*</span>
+            <label htmlFor="desc" className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">
+              Your side * (20+ chars)
             </label>
             <textarea
-              id="description"
+              id="desc"
               value={form.description}
-              onChange={e => updateField("description", e.target.value)}
-              onBlur={() => handleBlur('description')}
-              aria-invalid={!!errors.description}
-              aria-describedby={errors.description ? "desc-error" : undefined}
-              rows={5}
-              placeholder="What happened? Why are you right? Give us the details... The more context, the fairer the judgment."
-              className={`w-full px-4 py-3 rounded-lg bg-[var(--bg-surface)] border-2 transition-all resize-none input-glow ${
-                errors.description && touched.description
-                  ? 'border-[var(--error)]' 
-                  : 'border-[var(--border)] focus:border-[var(--accent)]'
-              }`}
+              onChange={e => handleInput("description", e.target.value)}
+              rows={4}
+              placeholder="What happened? Why are you right?"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--bg-surface)] border-2 border-[var(--border)] focus:border-[var(--accent)] input-glow resize-none"
             />
-            <div className="flex justify-between text-sm mt-2">
-              {errors.description && touched.description && (
-                <p id="desc-error" className="text-[var(--error)] text-sm">
-                  {errors.description === 'too_short' 
-                    ? 'Need more details please (20+ chars)' 
-                    : 'Please describe your side'}
-                </p>
-              )}
-              <span className={`ml-auto text-sm ${
-                form.description.length >= 20 
-                  ? 'text-[var(--success)]' 
-                  : 'text-[var(--text-muted)]'
-              }`}>
-                {form.description.length}/20 min
-              </span>
-            </div>
+            <p className={`text-right text-sm mt-1 ${form.description.length >= 20 ? 'text-[var(--success)]' : 'text-[var(--text-muted)]'}`}>
+              {form.description.length}/20
+            </p>
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn btn-primary w-full text-lg py-4"
-          >
-            {isSubmitting ? (
-              <>
-                <span className="spinner spinner-small" />
-                Filing Case...
-              </>
-            ) : (
-              <>
-                📋 Submit My Case
-                <span aria-hidden="true">→</span>
-              </>
-            )}
+          {!shareMode && (
+            <button type="button" onClick={() => setShareMode(true)} className="btn btn-ghost w-full">
+              🔗 Partner B is remote?
+            </button>
+          )}
+
+          <button type="submit" disabled={isSubmitting} className="btn btn-primary w-full text-lg py-4">
+            {isSubmitting ? <span className="spinner spinner-small" /> : "📋 Submit"}
           </button>
-          
-          <p className="text-center text-xs text-[var(--text-muted)]">
-            Data stays on your device • No account required
-          </p>
         </form>
       </div>
     </main>
