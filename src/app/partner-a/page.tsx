@@ -30,6 +30,7 @@ export default function PartnerAForm() {
   const [shareMode, setShareMode] = useState(false);
   const [shareCode, setShareCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [useCloud, setUseCloud] = useState(false);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -45,24 +46,34 @@ export default function PartnerAForm() {
     if (!validate()) return;
     setIsSubmitting(true);
     
-    const codeGenerate = generateCode();
+    const code = generateCode();
     const caseData = {
-      id: codeGenerate,
+      id: code,
       partnerA: form,
       timestamp: new Date().toISOString(),
       status: "pending",
+      useCloud,
     };
     
-    if (shareMode) {
-      // Show share code for Partner B to join remotely
-      localStorage.setItem("lovecourt_pending_" + codeGenerate, JSON.stringify(caseData));
-      setShareCode(codeGenerate);
-      setIsSubmitting(false);
-    } else {
-      // Same device: store directly and go to Partner B
-      localStorage.setItem("lovecourt_pending", JSON.stringify(caseData));
-      router.push("/partner-b");
+    if (useCloud) {
+      // Try Supabase, fall back to localStorage
+      try {
+        const { supabase, createDispute, getDisputeByCode } = await import('@/lib/supabase');
+        const dispute = await createDispute(code, form.category);
+        if (dispute) {
+          // Store in localStorage as backup
+          localStorage.setItem("lovecourt_pending_cloud_" + code, JSON.stringify({ ...caseData, cloud: true }));
+          router.push("/partner-b");
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase not configured, using localStorage');
+      }
     }
+    
+    // Fall back to localStorage
+    localStorage.setItem("lovecourt_pending", JSON.stringify(caseData));
+    router.push("/partner-b");
   };
 
   const copyLink = async () => {
@@ -123,10 +134,10 @@ export default function PartnerAForm() {
         {shareMode && (
           <div className="card mb-6 animate-fade-up">
             <p className="text-sm text-[var(--text-muted)] mb-4">
-              Partner B will join remotely. When they submit, you'll both see the verdict!
+              Partner B will join remotely. When they submit, you&apos;ll both see the verdict!
             </p>
             <button onClick={() => setShareMode(false)} className="btn btn-ghost w-full">
-              ← Actually, we're together
+              ← Actually, we&apos;re together
             </button>
           </div>
         )}
