@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-interface Case {
+export interface Case {
   id: string;
   partnerA: { category: string; intensity: number; description: string };
   partnerB: { category: string; intensity: number; description: string };
@@ -11,25 +11,46 @@ interface Case {
 }
 
 const verdicts = [
-  { winner: "A", text: "Partner A Wins!", emoji: "👤", reasoning: "After careful consideration of both arguments, the evidence strongly supports Partner A's position. Partner B's rebuttal failed to address the core issues raised." },
-  { winner: "B", text: "Partner B Wins!", emoji: "👥", reasoning: "Following a thorough review of both submissions, the balance of evidenceclearly favors Partner B. Partner A's claims were not sufficiently substantiated." },
-  { winner: "draw", text: "It's a Draw!", emoji: "⚖️", reasoning: "Both parties presented compelling arguments. The judge finds that neither party is entirely right or wrong. Compromise is hereby recommended." },
+  { 
+    winner: "A", 
+    text: "Partner A Wins!", 
+    emoji: "👤", 
+    color: "text-[var(--gold-400)]",
+    reasoning: "After careful consideration of both arguments, the evidence strongly supports Partner A's position. Partner B's rebuttal failed to address the core issues raised."
+  },
+  { 
+    winner: "B", 
+    text: "Partner B Wins!", 
+    emoji: "👥", 
+    color: "text-[var(--gold-400)]",
+    reasoning: "Following a thorough review of both submissions, the balance of evidence clearly favors Partner B. Partner A's claims were not sufficiently substantiated."
+  },
+  { 
+    winner: "draw", 
+    text: "It's a Draw!", 
+    emoji: "⚖️", 
+    color: "text-[var(--cream)]",
+    reasoning: "Both parties presented compelling arguments. The judge finds that neither party is entirely right or wrong. A compromise is hereby recommended."
+  },
 ];
 
 function getVerdict(caseData: Case) {
-  // Simple mock algorithm based on combined intensity
-  const aScore = caseData.partnerA.intensity + Math.random() * 2;
-  const bScore = caseData.partnerB.intensity + Math.random() * 2;
-  const diff = Math.abs(aScore - bScore);
+  const aScore = caseData.partnerA.intensity + (caseData.partnerA.description.length / 50);
+  const bScore = caseData.partnerB.intensity + (caseData.partnerB.description.length / 50);
+  const scoreDiff = Math.abs(aScore - bScore);
   
-  if (diff < 1.5) return verdicts[2]; // draw
+  // More likely to be a draw if scores are close
+  if (scoreDiff < 1.5) return verdicts[2];
+  if (scoreDiff < 3) return Math.random() > 0.5 ? verdicts[0] : verdicts[1];
   return aScore > bScore ? verdicts[0] : verdicts[1];
 }
+
+type Phase = 'loading' | 'thinking' | 'drumming' | 'reveal';
 
 export default function VerdictPage() {
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [verdict, setVerdict] = useState<typeof verdicts[0] | null>(null);
-  const [phase, setPhase] = useState<"loading" | "thinking" | "reveal">("loading");
+  const [phase, setPhase] = useState<Phase>('loading');
 
   useEffect(() => {
     const stored = localStorage.getItem("lovecourt_current");
@@ -37,13 +58,14 @@ export default function VerdictPage() {
       const parsed = JSON.parse(stored);
       setCaseData(parsed);
       
-      // Start animation sequence
-      setPhase("loading");
-      setTimeout(() => setPhase("thinking"), 1500);
+      // Animation sequence
+      setPhase('loading');
+      setTimeout(() => setPhase('thinking'), 1200);
+      setTimeout(() => setPhase('drumming'), 3500);
       setTimeout(() => {
         setVerdict(getVerdict(parsed));
-        setPhase("reveal");
-      }, 4000);
+        setPhase('reveal');
+      }, 5000);
     }
   }, []);
 
@@ -51,124 +73,149 @@ export default function VerdictPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="text-center">
-          <span className="spinner block mx-auto mb-4" />
+          <div className="spinner mb-4 mx-auto" />
           <p className="text-[var(--text-secondary)]">Loading case...</p>
-          <Link href="/" className="btn btn-ghost mt-4">← Back to Court</Link>
+          <Link href="/" className="btn btn-ghost mt-6">
+            ← Back to Court
+          </Link>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-4 py-8">
-      <div className="container max-w-lg mx-auto w-full text-center">
+    <main className="min-h-screen flex flex-col items-center px-4 py-8 bg-pattern">
+      <div className="container max-w-lg mx-auto w-full">
         {/* Progress */}
-        <div className="progress-bar mb-8">
-          <div className="progress-bar-fill" style={{ width: '100%' }} />
+        <div className="progress-track mb-8">
+          <div className="progress-bar" style={{ width: '100%' }} />
         </div>
 
-        {/* Phase: Loading */}
-        {phase === "loading" && (
-          <div className="animate-[fadeUp_0.4s_ease_forwards]">
-            <span className="text-6xl block mb-4">📁</span>
-            <h1 className="display-2 font-serif text-[var(--cream)] mb-2">
+        {/* PHASE: LOADING */}
+        {phase === 'loading' && (
+          <div className="text-center py-16 animate-fade-in">
+            <span className="text-6xl block mb-6">📁</span>
+            <h1 className="display-2 font-serif text-[var(--cream)] mb-4">
               Case Filed
             </h1>
-            <p className="text-[var(--text-secondary)]">
+            <p className="text-[var(--text-muted)] font-mono text-sm">
               {caseData.id}
             </p>
           </div>
         )}
 
-        {/* Phase: Thinking */}
-        {phase === "thinking" && (
-          <div className="animate-[fadeUp_0.4s_ease_forwards]">
-            <div className="judge-thinking">
-              <span className="text-8xl block mb-4">🧐</span>
+        {/* PHASE: THINKING */}
+        {phase === 'thinking' && (
+          <div className="text-center py-16 animate-fade-in">
+            <div className="inline-block judge-thinking mb-6">
+              <span className="text-8xl block">🧐</span>
             </div>
-            <h1 className="display-2 font-serif text-[var(--cream)] mb-2">
+            <h1 className="display-2 font-serif text-[var(--cream)] mb-4">
               Deliberating...
             </h1>
-            <p className="text-[var(--text-secondary)] mb-4">
+            <p className="text-[var(--text-secondary)] mb-6">
               The Judge is considering all evidence
             </p>
-            <div className="flex justify-center gap-1">
-              {[0, 1, 2].map(i => (
-                <span 
-                  key={i}
-                  className="w-2 h-2 rounded-full bg-[var(--accent)]"
-                  style={{ 
-                    animation: 'spin 0.8s ease-in-out infinite',
-                    animationDelay: `${i * 0.15}s`,
-                    opacity: 0.3 + (i * 0.25)
-                  }}
-                />
-              ))}
+            <div className="loader-dots justify-center">
+              <span /><span /><span />
             </div>
           </div>
         )}
 
-        {/* Phase: Reveal */}
-        {phase === "reveal" && verdict && (
-          <div className="space-y-6 animate-[fadeUp_0.6s_ease_forwards]">
-            {/* Spotlight effect */}
-            <div className="verdict-spotlight">
-              <span className="text-8xl block mb-4 judge-gavel">⚖️</span>
+        {/* PHASE: DRUMMING */}
+        {phase === 'drumming' && (
+          <div className="text-center py-16 animate-fade-in">
+            <div className="inline-block animate-drumroll mb-6">
+              <span className="text-8xl block">⚖️</span>
             </div>
-            
-            {/* Verdict */}
-            <div className="verdict-bang">
-              <h1 className="display-1 font-serif text-[var(--gold-500)] mb-4">
+            <h1 className="display-2 font-serif text-[var(--cream)] mb-4">
+              <span className="animate-pulse-once">THE VERDICT</span>
+            </h1>
+            <p className="text-[var(--text-muted)]">
+              * drum roll *
+            </p>
+          </div>
+        )}
+
+        {/* PHASE: REVEAL */}
+        {phase === 'reveal' && verdict && (
+          <div className="space-y-6 animate-verdict">
+            {/* Spotligth effect container */}
+            <div className="text-center py-8 animate-spotlight">
+              <span className="text-8xl block mb-6 animate-gavel">⚖️</span>
+              
+              <h1 className={`display-1 font-serif mb-4 ${verdict.color}`}>
                 {verdict.text}
               </h1>
             </div>
             
-            {/* Reasoning */}
-            <div className="card text-left">
-              <h2 className="text-sm font-medium text-[var(--accent)] mb-3">
+            {/* Reasoning Card */}
+            <div className="card animate-fade-up" style={{ animationDelay: '300ms' }}>
+              <h2 className="text-sm font-semibold text-[var(--gold-400)] mb-4">
                 📜 The Judge&apos;s Reasoning
               </h2>
-              <p className="text-[var(--text-secondary)] leading-relaxed">
+              <p className="text-[var(--text-secondary)] leading-relaxed text-lg">
                 {verdict.reasoning}
               </p>
             </div>
             
-            {/* Summary */}
+            {/* Summary Cards */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="card">
-                <h3 className="text-sm font-medium text-[var(--text-muted)] mb-2">Partner A</h3>
-                <p className="text-sm text-[var(--text-secondary)] truncate">
-                  {caseData.partnerA.description.slice(0, 50)}...
+              <div className="card animate-fade-up" style={{ animationDelay: '450ms' }}>
+                <h3 className="text-xs font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wide">
+                  👤 Partner A
+                </h3>
+                <p className="text-sm text-[var(--text-secondary)] line-clamp-3 mb-3">
+                  "{caseData.partnerA.description}"
                 </p>
-                <span className="text-lg text-[var(--accent)] mt-2 block">
-                  Level {caseData.partnerA.intensity}/5
-                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-[var(--bg-interactive)] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-[var(--gold-500)] rounded-full transition-all"
+                      style={{ width: `${(caseData.partnerA.intensity / 5) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold text-[var(--gold-400)]">
+                    {caseData.partnerA.intensity}/5
+                  </span>
+                </div>
               </div>
-              <div className="card">
-                <h3 className="text-sm font-medium text-[var(--text-muted)] mb-2">Partner B</h3>
-                <p className="text-sm text-[var(--text-secondary)] truncate">
-                  {caseData.partnerB.description.slice(0, 50)}...
+              
+              <div className="card animate-fade-up" style={{ animationDelay: '550ms' }}>
+                <h3 className="text-xs font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wide">
+                  👥 Partner B
+                </h3>
+                <p className="text-sm text-[var(--text-secondary)] line-clamp-3 mb-3">
+                  "{caseData.partnerB.description}"
                 </p>
-                <span className="text-lg text-[var(--accent)] mt-2 block">
-                  Level {caseData.partnerB.intensity}/5
-                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-[var(--bg-interactive)] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-[var(--gold-500)] rounded-full"
+                      style={{ width: `${(caseData.partnerB.intensity / 5) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold text-[var(--gold-400)]">
+                    {caseData.partnerB.intensity}/5
+                  </span>
+                </div>
               </div>
             </div>
             
-            {/* Actions */}
-            <div className="flex flex-col gap-3">
-              <Link href="/" className="btn btn-primary w-full">
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3 pt-4">
+              <Link href="/" className="btn btn-primary w-full text-lg py-4">
                 🎮 New Case
               </Link>
               <Link href="/history" className="btn btn-secondary w-full">
-                📜 View History
+                📜 View All History
               </Link>
             </div>
           </div>
         )}
 
         {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-[var(--border)]">
+        <footer className="mt-16 pt-8 border-t border-[var(--border)] text-center">
           <p className="text-sm text-[var(--text-muted)]">
             ❤️ Fair & Impartial Since 2026
           </p>
