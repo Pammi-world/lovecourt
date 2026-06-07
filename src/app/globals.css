@@ -341,3 +341,40 @@ textarea { resize: vertical; min-height: 100px; }
   .card-interactive:hover { transform: none; }
   .card-interactive:active { transform: scale(0.98); }
 }
+
+/* Mobile swipe hints */
+@media (max-width: 480px) {
+  .swipe-cards {
+    scroll-snap-type: x mandatory;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .swipe-cards::-webkit-scrollbar {
+    display: none;
+  }
+  .swipe-card {
+    scroll-snap-align: center;
+    min-width: 85vw;
+  }
+}
+
+/* Sound effect placeholder (disabled by default) */
+.sound-enabled {
+  --sound-volume: 0.3;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --gold-500: #ffd700;
+    --cream: #ffffff;
+    --navy-900: #000000;
+  }
+}
+
+/* Active state for cards */
+.card-active {
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 2px var(--gold-500);
+}
